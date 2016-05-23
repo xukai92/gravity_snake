@@ -1,7 +1,7 @@
-from flask import Flask
+from flask import Flask, render_template
 app = Flask(__name__)
 
-@application.route("/")
+@app.route("/")
 def gravity_snake():
     return render_template('gravity_snake.html')
 
