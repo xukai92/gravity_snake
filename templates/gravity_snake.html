@@ -1,0 +1,586 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width,
+		user-scalable=no, initial-scale=1, maximum-scale=1, user-scalable=0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+<style type="text/css">
+body { margin: 0; padding: 0; background: #000;}
+canvas { display: block; margin: 0 auto; background: #fff; }
+</style>
+
+</head>
+
+<body>
+
+<canvas> </canvas>
+<script>
+// http://paulirish.com/2011/requestanimationframe-for-smart-animating
+// shim layer with setTimeout fallback
+window.requestAnimFrame = (function(){
+	return  window.requestAnimationFrame       ||
+					window.webkitRequestAnimationFrame ||
+					window.mozRequestAnimationFrame    ||
+					window.oRequestAnimationFrame      ||
+					window.msRequestAnimationFrame     ||
+					function( callback ){
+						window.setTimeout(callback, 1000 / 60);
+					};
+})();
+
+// namespace our game
+var SNAKE = {
+
+		// set up some initial values
+		WIDTH: 320,
+		HEIGHT:  480,
+		SIZE: 1,
+		INITIALLENGTH: 3,
+		DELAY: 10,
+		VERSION: "1.1",
+		nextBlock: 100,
+		detect_angle: 40,
+		DIFFICULT: 0.3,
+		add: null,
+		direction: null,
+		current_x: 0,
+		game_status: 0,
+		test: "test",
+		test2: "test2",
+		test3: "test3",
+		test4: "test4",
+
+		// let's keep track of scale
+		// along with all initial declarations
+		// at the start of the program
+		scale: "1",
+		// the position of the canvas
+		// in relation to the screen
+		offset: {top: "0", left: "0"},
+
+		entities: [],
+		blocks: [],
+		stones: [],
+		SnakeHead: null,
+		// we'll set the rest of these
+		// in the init function
+		RATIO:  null,
+		currentWidth:  null,
+		currentHeight:  null,
+		canvas: null,
+		ctx:  null,
+
+		score: {
+				eat: 0
+		},
+
+		init: function() {
+				// the proportion of width to height
+				SNAKE.RATIO = SNAKE.WIDTH / SNAKE.HEIGHT;
+				// these will change when the screen is resized
+				SNAKE.currentWidth = SNAKE.WIDTH;
+				SNAKE.currentHeight = SNAKE.HEIGHT;
+				// this is our canvas element
+				SNAKE.canvas = document.getElementsByTagName('canvas')[0];
+				// setting this is important
+				// otherwise the browser will
+				// default to 320 x 200
+				SNAKE.canvas.width = SNAKE.WIDTH;
+				SNAKE.canvas.height = SNAKE.HEIGHT;
+				// the canvas context enables us to
+				// interact with the canvas api
+				SNAKE.ctx = SNAKE.canvas.getContext('2d');
+				SNAKE.add = SNAKE.DELAY;
+
+				// we need to sniff out Android and iOS
+				// so that we can hide the address bar in
+				// our resize function
+				SNAKE.ua = navigator.userAgent.toLowerCase();
+				SNAKE.android = SNAKE.ua.indexOf('android') > -1 ? true : false;
+				SNAKE.ios = ( SNAKE.ua.indexOf('iphone') > -1 || SNAKE.ua.indexOf('ipad') > -1  ) ?
+						true : false;
+
+				// we're ready to resize
+				SNAKE.resize();
+
+				if (SNAKE.android || SNAKE.ios) {
+				window.addEventListener('deviceorientation', function(e) {
+					e.preventDefault();
+					var x = e.alpha;
+					var y = e.beta;
+					var z = e.gamma;
+					var w = e.absolute;
+					var key;
+
+					if ((y >= 90 - SNAKE.detect_angle) && (y <= 90 + SNAKE.detect_angle)) {
+						key = 40; // down
+						SNAKE.current_x = x;
+					}
+					if ((y >= -90 - SNAKE.detect_angle) && (y <= -90 + SNAKE.detect_angle)) {
+						key = 38; // up
+						SNAKE.current_x = x;
+					}
+
+					if (z <= -90 + SNAKE.detect_angle) {
+						key = 37; // left
+						SNAKE.current_x = x;
+					}
+					if (z >= 90 - SNAKE.detect_angle) {
+						key = 39; // right
+						SNAKE.current_x = x;
+					}
+
+					SNAKE.Input.set(key);
+					SNAKE.test = x; SNAKE.test2 = y; SNAKE.test3 = z; SNAKE.test4 = w;
+				}, false);
+				}
+				else {
+				window.addEventListener('keydown', function(e) {
+				    e.preventDefault();
+				    SNAKE.Input.set(e.keyCode);
+				}, false);
+			}
+
+
+		window.addEventListener('click', function(e) {
+				e.preventDefault();
+				if (SNAKE.game_status != 1) {
+				SNAKE.game_status = 1;
+				SNAKE.snake_init();
+			}
+		}, false);
+
+		// listen for touches
+		window.addEventListener('touchstart', function(e) {
+				e.preventDefault();
+				if (SNAKE.game_status != 1) {
+				SNAKE.game_status = 1;
+				SNAKE.snake_init();
+			}
+		}, false);
+
+				SNAKE.loop();
+		},
+
+		snake_init: function() {
+			SNAKE.score.eat = 0;
+			SNAKE.entities = [];
+			SNAKE.blocks = [];
+			SNAKE.stones = [];
+			SnakeHead = new SNAKE.Head();
+			SnakeHead.x = SNAKE.WIDTH / 2;
+			SnakeHead.y = SNAKE.HEIGHT / 2;
+			SNAKE.entities.push(SnakeHead);
+			var i;
+
+			for (i = 0; i < SNAKE.INITIALLENGTH; i += 1) {
+					SNAKE.entities.push(new SNAKE.Head());
+
+			}
+		},
+
+		// SNAKE.update function
+		update: function() {
+
+if (SNAKE.game_status == 1) {
+			if (SNAKE.entities.length > 4) {
+			for (i = 1; i < SNAKE.entities.length; i += 1) {
+					die = SNAKE.collides(SNAKE.entities[0], SNAKE.entities[i]);
+					if (die)  {
+						SNAKE.game_status = 2;
+					}
+			}
+
+			for (i = 0; i < SNAKE.stones.length; i += 1) {
+					die = SNAKE.collides(SNAKE.entities[0], SNAKE.stones[i]);
+					if (die)  {
+						SNAKE.game_status = 2;
+					}
+			}
+		}
+
+			SNAKE.nextBlock -= 1;
+			if ((SNAKE.nextBlock < 0) && (SNAKE.blocks.length < 10)) {
+					SNAKE.blocks.push(new SNAKE.Block(
+															parseInt(Math.random() * (SNAKE.WIDTH / 16 / SNAKE.SIZE)) * 16 * SNAKE.SIZE,
+															parseInt(Math.random() * (SNAKE.HEIGHT / 16 / SNAKE.SIZE - SNAKE.SIZE)) * 16 * SNAKE.SIZE + 48));
+					SNAKE.nextBlock = Math.random() * 200 + 200;
+			}
+
+			var i;
+			for (i = 0; i < SNAKE.blocks.length; i += 1) {
+					hit = SNAKE.collides(SNAKE.entities[0], SNAKE.blocks[i]);
+					if (hit)  {
+						SNAKE.add--;
+						if (SNAKE.add == (SNAKE.DELAY - 1)) {
+							SNAKE.score.eat += 1;
+							SNAKE.entities.push(new SNAKE.Head());
+							SNAKE.add = SNAKE.DELAY;
+							SNAKE.blocks[i].remove = hit;
+
+							if (Math.random() < SNAKE.DIFFICULT) {
+								SNAKE.stones.push(new SNAKE.Stone(
+																		parseInt(Math.random() * (SNAKE.WIDTH / 16 / SNAKE.SIZE)) * 16 * SNAKE.SIZE,
+																		parseInt(Math.random() * (SNAKE.HEIGHT / 16 / SNAKE.SIZE - SNAKE.SIZE)) * 16 * SNAKE.SIZE + 48));
+							}
+						}
+					}
+
+					if (SNAKE.blocks[i].remove) {
+							SNAKE.blocks.splice(i, 1);
+					}
+			}
+}
+
+
+		},
+
+		// SNAKE.render function
+		render: function() {
+			if (SNAKE.game_status == 0) {
+				SNAKE.Draw.clear();
+				SNAKE.Draw.rect(0, 0, SNAKE.WIDTH, SNAKE.HEIGHT, '#95a5a6');
+				SNAKE.Draw.text('Gravity', 20, 70, 47, '#000');
+				SNAKE.Draw.text('Snake v' + SNAKE.VERSION, 20, 120, 47, '#000');
+
+				SNAKE.Draw.text('Turn off auto-rotation of', 60, 160, 13, '#000');
+				if (SNAKE.ios) {
+					SNAKE.Draw.text('iOS before starting.', 60, 180, 13, '#000');
+				}
+				else
+				{
+					SNAKE.Draw.text('Andriod before starting.', 60, 180, 13, '#000');
+				}
+
+				SNAKE.Draw.rect(SNAKE.WIDTH / 2 - 48, SNAKE.HEIGHT / 2 - 30, 16, 16, '#2ecc71');
+				SNAKE.Draw.text('SNAKE', 150, SNAKE.HEIGHT / 2 - 30 + 13, 17, '#000');
+				SNAKE.Draw.rect(SNAKE.WIDTH / 2 - 48, SNAKE.HEIGHT / 2 - 30 + 32, 16, 16, '#f1c40f');
+				SNAKE.Draw.text('FOOD', 150, SNAKE.HEIGHT / 2 - 30 + 45, 17, '#000');
+				SNAKE.Draw.rect(SNAKE.WIDTH / 2 - 48, SNAKE.HEIGHT / 2 - 30 + 65, 16, 16, '#2c3e50');
+				SNAKE.Draw.text('STONE', 150, SNAKE.HEIGHT / 2 - 30 + 77, 17, '#000');
+
+				SNAKE.Draw.text('Your snake will always go', 45, 330, 15, '#000');
+				SNAKE.Draw.text('towards the earth!', 75, 350, 15, '#000');
+
+				SNAKE.Draw.text('Touch anywhere to start.', 40, 400, 17, '#000');
+
+				SNAKE.Draw.text('COPYRIGHT @ KAI XU', 85, 460, 13, '#c0392b');
+
+			}
+			else if (SNAKE.game_status == 2) {
+					SNAKE.Draw.rect(0, 100, 360, 240, '#e74c3c');
+					SNAKE.Draw.text('You Die', 35, 200, 59, '#95a5a6');
+					SNAKE.Draw.text('Score: ' + SNAKE.score.eat, 40, 250, 47, '#95a5a6');
+					SNAKE.Draw.text('Touch anywhere to play again.', 20, 280, 17, '#95a5a6');
+			}
+			else
+			{
+				SNAKE.Draw.clear();
+				SNAKE.Draw.rect(0, 48, SNAKE.WIDTH, SNAKE.HEIGHT, '#95a5a6');
+
+				SNAKE.Draw.text('Gravity Snake v' + SNAKE.VERSION, 20, 29, 17, '#000');
+				SNAKE.Draw.text('Eat: ' + SNAKE.score.eat, 250, 29, 14, '#000');
+				// SNAKE.Draw.text('Key: ' + SNAKE.Input.direction, 240, 10, 11, '#000');
+				// SNAKE.Draw.text(SNAKE.test, 100, 11, 11, '#000');
+				// SNAKE.Draw.text(SNAKE.test2, 100, 22, 11, '#000');
+				// SNAKE.Draw.text(SNAKE.test3, 100, 33, 11, '#000');
+				// SNAKE.Draw.text(SNAKE.test4, 100, 44, 11, '#000');
+
+				SnakeHead.update();
+				var i;
+				for (i = 0; i < SNAKE.entities.length; i += 1) {
+						SNAKE.entities[i].render();
+
+				}
+
+				for (i = 0; i < SNAKE.blocks.length; i += 1) {
+						SNAKE.blocks[i].render();
+
+				}
+				for (i = 0; i < SNAKE.stones.length; i += 1) {
+						SNAKE.stones[i].render();
+				}
+
+			}
+		},
+
+		loop: function() {
+
+
+				requestAnimFrame( SNAKE.loop );
+
+				SNAKE.update();
+				SNAKE.render();
+		},
+
+		resize: function() {
+
+				SNAKE.currentHeight = window.innerHeight;
+				// resize the width in proportion
+				// to the new height
+				SNAKE.currentWidth = SNAKE.currentHeight * SNAKE.RATIO;
+
+				// this will create some extra space on the
+				// page, allowing us to scroll past
+				// the address bar, thus hiding it.
+				if (SNAKE.android || SNAKE.ios) {
+						document.body.style.height = (window.innerHeight + 50) + 'px';
+				}
+
+				// set the new canvas style width and height
+				// note: our canvas is still 320 x 480, but
+				// we're essentially scaling it with CSS
+				SNAKE.canvas.style.width = SNAKE.currentWidth + 'px';
+				SNAKE.canvas.style.height = SNAKE.currentHeight + 'px';
+
+				// this will create some extra space on the
+				// page, enabling us to scroll past
+				// the address bar, thus hiding it.
+				if (SNAKE.android || SNAKE.ios) {
+						document.body.style.height = (window.innerHeight + 50) + 'px';
+				}
+
+				// we use a timeout here because some mobile
+				// browsers don't fire if there is not
+				// a short delay
+				window.setTimeout(function() {
+								window.scrollTo(0,1);
+				}, 1);
+
+				// add this to the resize function.
+				SNAKE.scale = SNAKE.currentWidth / SNAKE.WIDTH;
+				SNAKE.offset.top = SNAKE.canvas.offsetTop;
+				SNAKE.offset.left = SNAKE.canvas.offsetLeft;
+		}
+
+};
+
+// abstracts various canvas operations into
+// standalone functions
+SNAKE.Draw = {
+
+		clear: function() {
+				SNAKE.ctx.clearRect(0, 0, SNAKE.WIDTH, SNAKE.HEIGHT);
+		},
+
+		rect: function(x, y, w, h, col) {
+				SNAKE.ctx.fillStyle = col;
+				SNAKE.ctx.fillRect(x, y, w, h);
+		},
+
+		circle: function(x, y, r, col) {
+				SNAKE.ctx.fillStyle = col;
+				SNAKE.ctx.beginPath();
+				SNAKE.ctx.arc(x + 5, y + 5, r, 0,  Math.PI * 2, true);
+				SNAKE.ctx.closePath();
+				SNAKE.ctx.fill();
+		},
+
+		text: function(string, x, y, size, col) {
+				SNAKE.ctx.font = 'bold '+size+'px Monospace';
+				SNAKE.ctx.fillStyle = col;
+				SNAKE.ctx.fillText(string, x, y);
+		}
+
+};
+
+SNAKE.Head = function() {
+
+		this.type = 'head';
+		this.l = 16 * SNAKE.SIZE;
+
+		this.count = 1;
+
+		this.remove = false;
+
+		this.update = function() {
+				this.count += 1;
+
+
+				if (this.count > SNAKE.DELAY && SNAKE.Input.direction != "other") {
+
+
+					switch(SNAKE.Input.direction)
+					{
+					case 37:
+						if (SNAKE.direction != "right")  SNAKE.direction = "left";
+						break;
+					case 38:
+						if (SNAKE.direction != "down")  SNAKE.direction = "up";
+						break;
+					case 39:
+						if (SNAKE.direction != "left")  SNAKE.direction = "right";
+						break;
+					case 40:
+						if (SNAKE.direction != "up")  SNAKE.direction = "down";
+						break;
+					}
+
+
+
+					var i;
+					for (i = SNAKE.entities.length - 1; i > 0; i -= 1) {
+
+							SNAKE.entities[i].set(SNAKE.entities[i-1]);
+					}
+
+					switch(SNAKE.direction)
+					{
+					case "left":
+						this.x -= this.l;
+						if (this.x < 0) this.x += SNAKE.WIDTH;
+						break;
+					case "up":
+						this.y -= this.l;
+
+						if (this.y < 48) this.y += SNAKE.HEIGHT - 48;
+						break;
+					case "right":
+						this.x += this.l;
+
+						if (this.x >= SNAKE.WIDTH) this.x -= SNAKE.WIDTH;
+						break;
+					case "down":
+						this.y += this.l;
+
+						if (this.y >= SNAKE.HEIGHT) this.y -= (SNAKE.HEIGHT - 48);
+						break;
+					default:
+					}
+
+
+
+					this.count = 1;
+				}
+		};
+
+		this.render = function() {
+				SNAKE.Draw.rect(this.x, this.y, this.l, this.l, '#2ecc71');
+				// SNAKE.Draw.text('(' + this.x + ", " + this.y + ")", 10, 10, 11, '#000');
+		};
+
+		this.set = function(head) {
+			this.x = head.x;
+			this.y = head.y;
+		};
+};
+
+SNAKE.Block = function(x, y) {
+
+		this.l = 16 * SNAKE.SIZE;
+		this.remove = false;
+		this.x = x;
+		this.y = y;
+
+		this.render = function() {
+				SNAKE.Draw.rect(this.x, this.y, this.l, this.l, '#f1c40f');
+		};
+};
+
+SNAKE.Stone = function(x, y) {
+
+		this.l = 16 * SNAKE.SIZE;
+		this.remove = false;
+		this.x = x;
+		this.y = y;
+
+		this.render = function() {
+				SNAKE.Draw.rect(this.x, this.y, this.l, this.l, '#2c3e50');
+		};
+};
+
+
+// this function checks if two circles overlap
+SNAKE.collides = function(a, b) {
+
+				if (a.x == b.x && a.y == b.y) {
+						return true;
+				} else {
+						return false;
+				}
+};
+
+SNAKE.Particle = function(x, y,r, col) {
+
+		this.x = x;
+		this.y = y;
+		this.r = r;
+		this.col = col;
+
+		// determines whether particle will
+		// travel to the right of left
+		// 50% chance of either happening
+		this.dir = (Math.random() * 2 > 1) ? 1 : -1;
+
+		// random values so particles do not
+		// travel at the same speeds
+		this.vx = ~~(Math.random() * 4) * this.dir;
+		this.vy = ~~(Math.random() * 7);
+
+		this.remove = false;
+
+		this.update = function() {
+
+				// update coordinates
+				this.x += this.vx;
+				this.y += this.vy;
+
+				// increase velocity so particle
+				// accelerates off screen
+				this.vx *= 0.99;
+				this.vy *= 0.99;
+
+				// adding this negative amount to the
+				// y velocity exerts an upward pull on
+				// the particle, as if drawn to the
+				// surface
+				this.vy -= 0.25;
+
+				// off screen
+				if (this.y < 0) {
+						this.remove = true;
+				}
+
+		};
+
+		this.render = function() {
+				SNAKE.Draw.circle(this.x, this.y, this.r, this.col);
+		};
+
+};
+
+SNAKE.Input = {
+		direction: null,
+		set: function(direction) {
+			switch(direction)
+			{
+			case 37:
+				// if (this.direction != "right")
+				this.direction = direction; //"left";
+				break;
+			case 38:
+				// if (this.direction != "down")
+				this.direction = direction; //"up";
+				break;
+			case 39:
+				// if (this.direction != "left")
+				this.direction = direction; //"right";
+				break;
+			case 40:
+				// if (this.direction != "up")
+				this.direction = direction; //"down";
+				break;
+			}
+		}
+};
+
+window.addEventListener('load', SNAKE.init, false);
+window.addEventListener('resize', SNAKE.resize, false);
+
+</script>
+</body>
+</html>
