@@ -292,9 +292,9 @@ if (SNAKE.game_status == 1) {
 
 				SnakeHead.update();
 				var i;
-				for (i = 0; i < SNAKE.entities.length; i += 1) {
-						SNAKE.entities[i].render();
-
+				SNAKE.entities[0].render("#27ae60") // head color
+				for (i = 1; i < SNAKE.entities.length; i += 1) {
+						SNAKE.entities[i].render("#2ecc71"); // body color
 				}
 
 				for (i = 0; i < SNAKE.blocks.length; i += 1) {
@@ -458,8 +458,8 @@ SNAKE.Head = function() {
 				}
 		};
 
-		this.render = function() {
-				SNAKE.Draw.rect(this.x, this.y, this.l, this.l, '#2ecc71');
+		this.render = function(color) {
+				SNAKE.Draw.rect(this.x, this.y, this.l, this.l, color);
 				// SNAKE.Draw.text('(' + this.x + ", " + this.y + ")", 10, 10, 11, '#000');
 		};
 
